@@ -1,0 +1,23 @@
+# .zpreztorc — Prezto's configuration (cut down from runcoms/zpreztorc).
+
+zstyle ':prezto:*:*' color 'yes'
+
+# This repo's own modules live in zsh/modules (next to this file).
+zstyle ':prezto:load' pmodule-dirs "${${(%):-%x}:A:h}/modules"
+
+# Order matters: the qode module ships the prompt theme, so it loads before 'prompt'.
+zstyle ':prezto:load' pmodule \
+  'environment' \
+  'terminal' \
+  'editor' \
+  'history' \
+  'directory' \
+  'utility' \
+  'completion' \
+  'git' \
+  'qode' \
+  'prompt'
+
+zstyle ':prezto:module:editor' key-bindings 'emacs'
+zstyle ':prezto:module:prompt' theme 'qode'
+zstyle ':prezto:module:terminal' auto-title 'no'

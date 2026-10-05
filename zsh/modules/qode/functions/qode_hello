@@ -1,0 +1,2 @@
+# qode_hello — autoloaded from the qode module's functions/ directory
+print -r -- "hello from qode"

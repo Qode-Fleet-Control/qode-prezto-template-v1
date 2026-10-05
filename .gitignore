@@ -1,3 +1,8 @@
-.env
 .fleet/
+*.log
 .fleet-deploy.log
+.env
+# local (non-docker) install target and zsh's runtime files
+.zprezto/
+zsh/.zcompdump*
+zsh/.zhistory
