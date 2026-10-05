@@ -1,0 +1,11 @@
+.git
+.github
+.fleet
+.fleet-deploy.log
+*.log
+.zprezto
+zsh/.zcompdump*
+zsh/.zhistory
+.env
+.env.*
+!.env.example

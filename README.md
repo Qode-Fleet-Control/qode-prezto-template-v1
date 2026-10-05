@@ -1,130 +1,89 @@
-# fleet-template-v1
+# Prezto template
 
-## What This Template Is
+Provisioned from [`Qode-Fleet-Control/fleet-template-v1`](https://github.com/Qode-Fleet-Control/fleet-template-v1) — the fleet
+lifecycle contract (`bin/`, `fleet.conf`, `compose.yaml`, deploy workflows) with a
+Prezto starter laid on top. **A job, not a service**: the image's default command runs the
+check and exits 0 on success; nothing listens on `$PORT`.
 
-`fleet-template-v1` is a **language-agnostic app lifecycle harness** for apps
-managed by the fleet platform. It gives any app — Node, Python, Go, a Docker
-Compose stack, anything — a uniform way to be deployed and controlled, without
-the fleet needing to know a single thing about your stack.
+## What it is
 
-The fleet injects runtime variables into the environment (`PORT`, `BASE_PATH`,
-`DATABASE_URL`) and calls `./bin/run` to deploy. Everything project-specific —
-how to install, build, and start your app — lives in **one file: `fleet.conf`**.
-That is the only file you edit per project.
+A versioned zsh setup (`VERSION`, currently 1.0.0) on [Prezto](https://github.com/sorin-ionescu/prezto):
 
-## Repository Structure
+| path | what |
+|---|---|
+| `zsh/.zshrc` | sources Prezto's `init.zsh` |
+| `zsh/.zpreztorc` | Prezto's config: the module list, the prompt theme |
+| `zsh/modules/qode/` | the setup's own Prezto module: `init.zsh` (`mkcd`, `ll`), autoloaded `functions/qode_hello` |
+| `zsh/modules/qode/functions/prompt_qode_setup` | the setup's own prompt theme: `qode <cwd> (<branch>) %` |
+| `scripts/install.sh` | clones Prezto (with submodules) at a pinned commit |
+| `scripts/check.sh` | **the job**: interactive zsh, checks the setup loaded |
 
-```
-fleet.conf        ← the only file you edit per project
-.env              ← local-only env vars (gitignored)
-bin/
-  _common.sh      ← shared logic; never edit this
-  run             ← install + build + start (called by the fleet)
-  start           ← start only (no rebuild)
-  restart         ← stop + full run
-  reload          ← hot-reload config without rebuild
-  stop            ← stop the running process
-```
+`zsh/` is the ZDOTDIR; `.zpreztorc` adds `zsh/modules` to `pmodule-dirs`, so custom
+modules live in the repo.
 
-## The One File You Edit: `fleet.conf`
+## Run it
 
-`fleet.conf` is sourced as shell by the lifecycle scripts. Fill in the commands
-for your stack; leave any command empty (`''`) to skip that step.
+**With docker** (what the fleet does):
 
-```sh
-NAME="my-app"           # label shown in fleet logs
-PORT="3000"             # default port (fleet overrides via $PORT env var)
-HEALTH_PATH="/"         # HTTP path that returns 200 when the app is ready
+    docker compose build
+    docker compose run --rm app        # the check; exit 0 = setup loaded
+    docker compose run --rm app zsh    # try the shell itself
 
-INSTALL_CMD='npm ci'
-BUILD_CMD='npm run build'
-START_CMD='node dist/server.js'   # must listen on $PORT; run in foreground
-RELOAD_CMD=''           # optional; empty → falls back to stop+start
-```
+**Without docker** (needs zsh and git; your `~/.zshrc` is left alone):
 
-> **Critical rule:** single-quote any command that uses `$PORT` or
-> `$BASE_PATH`. Single quotes defer variable expansion to **runtime** — when the
-> command actually runs, with the fleet-injected value — rather than at the
-> moment `fleet.conf` is sourced (when those values aren't set yet). Use
-> `START_CMD='gunicorn app:app --bind 0.0.0.0:$PORT'`, never double quotes.
+    ZPREZTODIR="$PWD/.zprezto" sh scripts/install.sh   # = fleet.conf INSTALL_CMD
+    ZPREZTODIR="$PWD/.zprezto" sh scripts/check.sh
+    ZDOTDIR="$PWD/zsh" ZPREZTODIR="$PWD/.zprezto" zsh  # use it
 
-## How the Lifecycle Works
+## Origin
 
-| Script | What it does | When to use |
-| --- | --- | --- |
-| `bin/run` | `INSTALL_CMD` → `BUILD_CMD` → `START_CMD` | Fleet deploy, fresh start |
-| `bin/start` | `START_CMD` only | Restart without rebuild |
-| `bin/restart` | stop + `bin/run` | After a code/dep change |
-| `bin/reload` | `RELOAD_CMD`, or stop+start if empty | After a config-only change |
-| `bin/stop` | Kill by pidfile or port | Tear down |
+Prezto's documented install (its README), pinned to commit `cff2d01871425b1b80710f8ec6a475c5a53145b4`:
 
-> The process PID is written to `.fleet/app.pid` so subsequent `stop`/`restart`
-> calls can find and terminate it reliably. If the pidfile is missing or stale,
-> `stop` falls back to freeing whatever is listening on `$PORT`.
+    git clone --recursive https://github.com/sorin-ionescu/prezto.git "${ZDOTDIR:-$HOME}/.zprezto"
 
-## How to Apply This to Your Project
+`zsh/.zshrc` and `zsh/.zpreztorc` are cut down from Prezto's `runcoms/`; the `qode`
+module follows Prezto's module layout (`init.zsh` + `functions/`), and the prompt
+follows its `prompt_<name>_setup` convention.
 
-### Step 1 — Copy the template into your repo
+## Deviations from stock output, and why
 
-```sh
-cp -r fleet-template-v1/* my-project/
-```
+- **Runcoms are not symlinked.** The README links every `runcoms/*` file into
+  `$ZDOTDIR`; here `zsh/` *is* the ZDOTDIR with its own `.zshrc`/`.zpreztorc`, so the
+  setup is versioned in the repo and Prezto stays a pinned dependency.
+- Prezto is cloned into `$ZPREZTODIR` (default `~/.zprezto`, `./.zprezto` locally)
+  rather than inside ZDOTDIR; `init.zsh` locates itself, so this works unchanged.
+- Submodules are fetched `--depth 1` to keep the image small.
+## Verified
 
-Or, if starting fresh, just clone it and work from `main`.
+**The docker image has NOT been built or run yet**: on 2026-10-05 the shared build host's docker disk was full (0-2 GB free for over 8 hours), so `docker compose build` was never attempted. Run `docker compose build && docker compose run --rm app` once before trusting it.
 
-### Step 2 — Edit `fleet.conf` (the only required change)
+Without docker (2026-10-05, zsh 5.9, throwaway `$HOME`): `scripts/install.sh` cloned
+Prezto at the pinned commit (with submodules) into `./.zprezto`, and
+`ZPREZTODIR=$PWD/.zprezto sh scripts/check.sh` passed — prezto, git + qode modules,
+qode prompt theme, prompt renders, nothing on stderr.
 
-Fill in your stack's commands. Per-stack examples:
 
-```sh
-# Node.js
-INSTALL_CMD='npm ci'
-BUILD_CMD='npm run build'
-START_CMD='node dist/index.js'
+## Fleet lifecycle
 
-# Python (Gunicorn)
-INSTALL_CMD='pip install -r requirements.txt'
-BUILD_CMD=''
-START_CMD='gunicorn app:app --bind 0.0.0.0:$PORT'
+`fleet.conf` drives every script in `bin/` (see `docs/fleet-lifecycle.md`). On the fleet
+the docker runtime runs `DOCKER_BUILD_CMD` (`docker compose build`) and, because this is
+a job and not a service, stops there: `DOCKER_START_CMD` is empty, the same as
+`START_CMD`. Run the job itself with `docker compose run --rm app`.
 
-# Go
-INSTALL_CMD=''
-BUILD_CMD='go build -o ./out/server ./cmd/server'
-START_CMD='./out/server'
+    ./bin/run                    # docker runtime: builds the image, then stops (no server)
+    docker compose run --rm app  # runs the job; exit code 0 = pass
+    FLEET_RUNTIME=process ./bin/run   # no docker: runs INSTALL_CMD, then stops at start
 
-# Docker Compose
-INSTALL_CMD=''
-BUILD_CMD='docker compose build'
-START_CMD='docker compose up'
-RELOAD_CMD='docker compose up -d --no-build'
-```
+`bin/run` ends with the template's own "no START_CMD" message — that is intentional.
 
-### Step 3 — Set local env vars in `.env` (gitignored)
+## Serving over HTTP
 
-```sh
-APP_NAME=My App
-DATABASE_URL=postgres://localhost/mydb
-```
+Fleet apps are served at the root of their own hostname
+(`https://<hash>.<FLEET_APP_DOMAIN>/`). **This repo has no HTTP surface**: `PORT`,
+`HEALTH_PATH` and `START_CMD` are empty and `compose.yaml` publishes nothing. If you add
+an HTTP endpoint, listen on `0.0.0.0:$PORT` (read at runtime), serve at `/`, set `PORT`,
+`HEALTH_PATH`, `START_CMD` and `DOCKER_START_CMD='docker compose up --remove-orphans'`
+in `fleet.conf`, and publish `"${PORT:-N}:${PORT:-N}"` in `compose.yaml`.
 
-### Step 4 — Verify standalone
-
-```sh
-PORT=3001 bin/run      # should install, build, and serve on 3001
-curl http://localhost:3001/   # should 200
-```
-
-### Step 5 — Connect to the fleet
-
-Point the fleet at your repo. It will clone it, inject `PORT` / `BASE_PATH` /
-`DATABASE_URL`, and call `bin/run`. As long as your `START_CMD` listens on
-`$PORT` and `HEALTH_PATH` returns 200, the fleet will mark the app healthy.
-
-## Key Invariants
-
-- **`START_CMD` must run in the foreground and listen on `$PORT`.** Do not use a
-  dev server — HMR / hot-reload chunks 404 behind the ingress and will break the
-  app.
-- **Never put secrets in `fleet.conf`** — it's committed. Use `.env` locally;
-  the fleet injects secrets via the environment.
-- **`bin/_common.sh` is shared infrastructure** — don't edit it per project. All
-  project-specific configuration belongs in `fleet.conf`.
+`compose.yaml` passes the fleet's variables (`DATABASE_URL`, `REDIS_URL`, `S3_*`,
+`SMTP_*` …) through to the container without values; this template reads none of them.

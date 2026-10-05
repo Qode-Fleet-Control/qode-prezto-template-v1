@@ -1,0 +1,30 @@
+# prompt_qode_setup — the qode prompt theme for Prezto's prompt module (promptinit):
+# "qode <cwd> <git branch>%". Selected by zstyle ':prezto:module:prompt' theme 'qode'.
+
+function prompt_qode_precmd {
+  if (( $+functions[git-info] )); then
+    git-info
+  fi
+}
+
+function prompt_qode_setup {
+  setopt LOCAL_OPTIONS
+  unsetopt XTRACE KSH_ARRAYS
+  prompt_opts=(cr percent sp subst)
+
+  # git-info fills this on each precmd; declare it up front so the prompt's
+  # ${git_info[prompt]} is an associative lookup even before the first precmd.
+  typeset -gA git_info
+
+  autoload -Uz add-zsh-hook
+  add-zsh-hook precmd prompt_qode_precmd
+
+  zstyle ':prezto:module:git:info' verbose 'no'
+  zstyle ':prezto:module:git:info:branch' format '%F{magenta}(%b)%f '
+  zstyle ':prezto:module:git:info:keys' format 'prompt' '%b'
+
+  PROMPT='%F{cyan}qode%f %F{blue}%~%f ${git_info[prompt]}%(?.%F{green}.%F{red})%#%f '
+  RPROMPT=''
+}
+
+prompt_qode_setup "$@"
